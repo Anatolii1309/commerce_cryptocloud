@@ -1,0 +1,28 @@
+<?php
+
+/**
+ * @file
+ * Provides functionality for handling commerce cryptocloud.
+ */
+
+use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Url;
+
+/**
+ * Implements hook_help().
+ */
+function commerce_cryptocloud_help($route_name, RouteMatchInterface $route_match) {
+  switch ($route_name) {
+    case 'help.page.commerce_cryptocloud':
+      $output = '<h3>' . t('About') . '</h3>';
+      $output .= '<p>' . t('Commerce СryptoСloud module is an integration of the payment system Cryptocloud. CryptoCloud is a reliable way to easily accept payments in the most popular cryptocurrencies. CryptoCloud - universal cryptocurrency payment processing solution for any business.') . '</p>';
+      $output .= '<p>' . t('Available currencies for conversion: USD, RUB, EUR, GBP') . '</p>';
+      $output .= '<h3>' . t('Configuration') . '</h3>';
+      $output .= '<p>' . t('To use this module, you need to <a href=":register">register</a> and set up API keys.', [
+        ':register' => Url::fromUri('https://app.cryptocloud.plus/?ref=0GQ2JDPCLT')->toString()
+        ]) . '</p>';
+      $output .= '<p>' . t('Go to "Commerce" -> "Configuration" -> "Payment gateways". You need to add a Cryptocloud payment gateway and set it up. On the settings page, enter API key, Shop ID and Secret key.') . '</p>';
+      $output .= '<p>' . t('On the app.cryptocloud.plus site, the URL for notifications is https://you_domain/cryptocloud-payment/index') . '</p>';
+      return $output;
+  }
+}
