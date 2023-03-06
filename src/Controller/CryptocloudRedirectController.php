@@ -70,14 +70,8 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
     $order_id = $this->currentRequest->request->get('order_id');
     $status = $this->currentRequest->request->get('status');
 
-    if (empty($token) || empty($invoice_id) || empty($order_id)
-      || empty($status) || ($status == 'success')) {
-      return new JsonResponse(['message' => 'Bad request'], 500);
-    }
-    /** @var \Drupal\commerce_order\Entity\Order $order */
-    $order = $this->entityTypeManager->getStorage('commerce_order')
-      ->load($order_id);
-    if (empty($order)) {
+    if (empty($invoice_id) || empty($order_id)
+      || empty($status) || ($status != 'success')) {
       return new JsonResponse(['message' => 'Bad request'], 500);
     }
     $gateway = $this->entityTypeManager->getStorage('commerce_payment_gateway')
@@ -90,10 +84,19 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
       return new JsonResponse(['message' => 'Bad request'], 500);
     }
     $configuration = $gateway->getPlugin()->getConfiguration();
-    if (empty($configuration['secret_key'])) {
-      return new JsonResponse(['message' => 'Bad request'], 500);
+
+    if (!empty($configuration['secret_key'])) {
+      if (empty($token)) {
+        return new JsonResponse(['message' => 'Bad request'], 500);
+      }
+      if (!$this->check($token, $invoice_id, $configuration['secret_key'])) {
+        return new JsonResponse(['message' => 'Bad request'], 500);
+      }
     }
-    if (!$this->check($token, $invoice_id, $configuration['secret_key'])) {
+    /** @var \Drupal\commerce_order\Entity\Order $order */
+    $order = $this->entityTypeManager->getStorage('commerce_order')
+      ->load($order_id);
+    if (empty($order)) {
       return new JsonResponse(['message' => 'Bad request'], 500);
     }
 
@@ -115,53 +118,36 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
    *
    * @param string $token
    *   The token.
-   * @param string $invoice_id
-   *   The invoice ID.
    * @param string $secret_key
    *   The secret key.
    *
    * @return bool
    *   Returns true if the keys match or false otherwise.
    */
-  private function check(string $token, string $invoice_id, string $secret_key): bool {
-    $headers = [
-      'alg'=>'HS256',
-      'typ'=>'JWT',
-    ];
-    $payload = [
-      'id' => $invoice_id,
-      'exp' => (time() + 300),
-    ];
+  private function check(string $token, string $secret_key): bool {
+    $token = explode('.', $token); // explode token based on JWT breaks
+    if (!isset($token[1]) && !isset($token[2])) {
+      return false; // fails if the header and payload is not set
+    }
+    $headers = base64_decode($token[0]); // decode header, create variable
+    $payload = base64_decode($token[1]); // decode payload, create variable
+    $clientSignature = $token[2]; // create variable for signature
 
-    $jwt = $this->generate_jwt($headers, $payload, $secret_key);
+    if (!json_decode($payload)) {
+      return false; // fails if payload does not decode
+    }
 
-    return $token == $jwt;
-  }
+    if ((json_decode($payload)->exp - time()) < 0) {
+      return false; // fails if expiration is greater than 0, setup for 1 minute
+    }
 
-  /**
-   * Getting JWT token.
-   *
-   * @param array $headers
-   *   The header.
-   * @param array $payload
-   *   The Payload.
-   * @param string $secret
-   *   The secret key.
-   *
-   * @return string
-   *   Return token.
-   */
-  private function generate_jwt(array $headers, array $payload, string $secret): string {
-    $headers_encoded = $this->base64url_encode(json_encode($headers));
+    $base64_header = $this->base64url_encode($headers);
+    $base64_payload = $this->base64url_encode($payload);
 
-    $payload_encoded = $this->base64url_encode(json_encode($payload));
+    $signature = hash_hmac('SHA256', $base64_header . "." . $base64_payload, $secret_key, true);
+    $base64_signature = $this->base64url_encode($signature);
 
-    $signature = hash_hmac('SHA256', "$headers_encoded.$payload_encoded", $secret, TRUE);
-    $signature_encoded = $this->base64url_encode($signature);
-
-    $jwt = "$headers_encoded.$payload_encoded.$signature_encoded";
-
-    return $jwt;
+    return ($base64_signature === $clientSignature);
   }
 
   /**
