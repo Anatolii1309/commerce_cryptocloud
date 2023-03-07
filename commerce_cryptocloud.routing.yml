@@ -2,6 +2,7 @@ commerce_cryptocloud.index:
   path: 'cryptocloud-payment/index'
   defaults:
     _controller: '\Drupal\commerce_cryptocloud\Controller\CryptocloudRedirectController::index'
+  methods: ['POST']
   options:
     no_cache: TRUE
   requirements:

@@ -3,6 +3,7 @@
 namespace Drupal\commerce_cryptocloud\Controller;
 
 use Drupal\commerce_order\Entity\Order;
+use Drupal\Component\Serialization\Json;
 use Drupal\Core\Config\Config;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
@@ -10,6 +11,7 @@ use Drupal\Core\Routing\TrustedRedirectResponse;
 use GuzzleHttp\Exception\BadResponseException;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
@@ -58,17 +60,24 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
   /**
    * Callback method which accepts POST.
    *
+   * @param \Symfony\Component\HttpFoundation\Request $request
+   *   The Request.
+   *
    * @return \Drupal\Core\Routing\TrustedRedirectResponse|\Symfony\Component\HttpFoundation\JsonResponse
    *   Return trusted redirect.
    * @throws \Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException
    * @throws \Drupal\Component\Plugin\Exception\PluginNotFoundException
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
-  public function index() {
-    $token = $this->currentRequest->request->get('token');
-    $invoice_id = $this->currentRequest->request->get('invoice_id');
-    $order_id = $this->currentRequest->request->get('order_id');
-    $status = $this->currentRequest->request->get('status');
+  public function index(Request $request) {
+    $data = Json::decode($request->getContent());
+    if (empty($data)) {
+      return new JsonResponse(['message' => 'Bad request'], 500);
+    }
+    $token = $data['token'];
+    $invoice_id = $data['invoice_id'];
+    $order_id = $data['order_id'];
+    $status = $data['status'];
 
     if (empty($invoice_id) || empty($order_id)
       || empty($status) || ($status != 'success')) {
