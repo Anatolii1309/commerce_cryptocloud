@@ -119,7 +119,7 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
     ]);
     $payment->save();
 
-    return new TrustedRedirectResponse('/', 302);
+    return new JsonResponse(['status' => 'completed'], 200);
   }
 
   /**
