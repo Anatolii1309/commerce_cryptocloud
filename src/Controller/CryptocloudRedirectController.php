@@ -2,18 +2,12 @@
 
 namespace Drupal\commerce_cryptocloud\Controller;
 
-use Drupal\commerce_order\Entity\Order;
-use Drupal\Component\Serialization\Json;
-use Drupal\Core\Config\Config;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
-use Drupal\Core\Routing\TrustedRedirectResponse;
-use GuzzleHttp\Exception\BadResponseException;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpKernel\Exception\BadRequestHttpException;
 
 /**
  * Class CryptocloudRedirectController.
@@ -70,7 +64,7 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
   public function index(Request $request) {
-    $data = Json::decode($request->getContent());
+    $data = $this->data_json($request->getContent());
     if (empty($data)) {
       return new JsonResponse(['message' => 'Bad request'], 500);
     }
@@ -120,6 +114,36 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
     $payment->save();
 
     return new JsonResponse(['status' => 'completed'], 200);
+  }
+
+  /**
+   * Decode json.
+   *
+   * @param string $json
+   *   The josn string.
+   *
+   * @return array
+   *   Json decode array.
+   */
+  public function data_json(string $json) {
+    $json = substr($json, 0, -1);
+    $json = substr($json, 1);
+    $data = explode(', ', $json);
+    if (empty($data)) {
+      return [];
+    }
+    $result = [];
+    foreach ($data as $values) {
+      $massive = explode(': ', $values);
+      $name = str_replace('"', '', $massive[0]);
+      $first = mb_substr($massive[1], 0, 1);
+      $last = mb_substr($massive[1], -1);
+      $value = $first == $last || ($last == '"')
+        ? str_replace('"', '', $massive[1]) : $massive[1];
+      $result[$name] = $value;
+    }
+
+    return $result;
   }
 
   /**
