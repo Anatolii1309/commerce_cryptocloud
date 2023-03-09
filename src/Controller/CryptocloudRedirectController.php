@@ -2,6 +2,7 @@
 
 namespace Drupal\commerce_cryptocloud\Controller;
 
+use Drupal\Component\Serialization\Json;
 use Drupal\Core\DependencyInjection\ContainerInjectionInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Symfony\Component\DependencyInjection\ContainerInterface;
@@ -64,7 +65,10 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
    * @throws \Drupal\Core\Entity\EntityStorageException
    */
   public function index(Request $request) {
-    $data = $this->data_json($request->getContent());
+    $data = Json::decode($request->getContent());
+    if (empty($data)) {
+      $data = $this->data_json($request->getContent());
+    }
     if (empty($data)) {
       return new JsonResponse(['message' => 'Bad request'], 500);
     }
@@ -135,10 +139,13 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
     $result = [];
     foreach ($data as $values) {
       $massive = explode(': ', $values);
+      if (empty($massive[1])) {
+        $massive = explode(':', $values);
+      }
       $name = str_replace('"', '', $massive[0]);
       $first = mb_substr($massive[1], 0, 1);
       $last = mb_substr($massive[1], -1);
-      $value = $first == $last || ($last == '"')
+      $value = $first == $last && ($last == '"')
         ? str_replace('"', '', $massive[1]) : $massive[1];
       $result[$name] = $value;
     }
