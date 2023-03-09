@@ -96,7 +96,7 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
       if (empty($token)) {
         return new JsonResponse(['message' => 'Bad request'], 500);
       }
-      if (!$this->check($token, $invoice_id, $configuration['secret_key'])) {
+      if (!$this->check($token, $configuration['secret_key'])) {
         return new JsonResponse(['message' => 'Bad request'], 500);
       }
     }
@@ -156,38 +156,34 @@ class CryptocloudRedirectController implements ContainerInjectionInterface {
   /**
    * Checking the token for request forgery.
    *
-   * @param string $token
+   * @param string $jwtToken
    *   The token.
-   * @param string $secret_key
+   * @param string $secretKey
    *   The secret key.
    *
    * @return bool
    *   Returns true if the keys match or false otherwise.
    */
-  private function check(string $token, string $secret_key): bool {
-    $token = explode('.', $token); // explode token based on JWT breaks
-    if (!isset($token[1]) && !isset($token[2])) {
-      return false; // fails if the header and payload is not set
+  private function check(string $jwtToken, string $secretKey): bool {
+    $jwtToken = substr($jwtToken,1);
+    $jwtToken = str_replace('"', "", $jwtToken);
+    $jwtParts = explode('.', $jwtToken);
+    if (count($jwtParts) !== 3) {
+      return FALSE;
     }
-    $headers = base64_decode($token[0]); // decode header, create variable
-    $payload = base64_decode($token[1]); // decode payload, create variable
-    $clientSignature = $token[2]; // create variable for signature
-
-    if (!json_decode($payload)) {
-      return false; // fails if payload does not decode
+    $payload = base64_decode($jwtParts[1]);
+    $signature = $jwtParts[2];
+    $payloadData = json_decode($payload);
+    if (!$payloadData || !isset($payloadData->exp) || $payloadData->exp < time()) {
+      return FALSE;
     }
+    $data = $jwtParts[0] . '.' . $jwtParts[1];
+    $hash = hash_hmac('sha256', $data, $secretKey, true);
+    $base64 = base64_encode($hash);
+    $urlSafe = str_replace(['+', '/'], ['-', '_'], $base64);
+    $encodedHash = rtrim($urlSafe, '=');
 
-    if ((json_decode($payload)->exp - time()) < 0) {
-      return false; // fails if expiration is greater than 0, setup for 1 minute
-    }
-
-    $base64_header = $this->base64url_encode($headers);
-    $base64_payload = $this->base64url_encode($payload);
-
-    $signature = hash_hmac('SHA256', $base64_header . "." . $base64_payload, $secret_key, true);
-    $base64_signature = $this->base64url_encode($signature);
-
-    return ($base64_signature === $clientSignature);
+    return hash_equals($encodedHash, $signature);
   }
 
   /**
